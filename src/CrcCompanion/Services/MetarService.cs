@@ -72,7 +72,7 @@ namespace CrcCompanion.Services
             {
                 _gate.Release();
             }
-            if (!_disposed) _ui.BeginInvoke(new Action(() => Updated?.Invoke()));
+            if (!_disposed) _ = _ui.BeginInvoke(new Action(() => Updated?.Invoke()));
         }
 
         private async Task<MetarReport?> FetchAsync(string id, DateTime now)

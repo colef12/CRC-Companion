@@ -52,7 +52,9 @@ The tray menu also has **Size**, an extra scale on top of Windows display scalin
 
 ## Weather data
 
-METARs come from VATSIM's METAR service (`metar.vatsim.net`), with aviationweather.gov as a fallback. They refresh every 2 minutes, and a newly added station is fetched right away.
+By default the app shows **real-world METARs** from aviationweather.gov, fetched for all stations in one request. VATSIM's METAR service (`metar.vatsim.net`) fills in any station aviationweather.gov doesn't return. Use the tray menu's **Weather source** to make VATSIM the primary source instead.
+
+Reports refresh every 2 minutes. A newly added station, or a change of source, is fetched right away. If a refresh fails, the last good report stays on screen.
 
 ## Building
 

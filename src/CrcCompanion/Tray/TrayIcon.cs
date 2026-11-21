@@ -9,6 +9,8 @@ namespace CrcCompanion.Tray
         string ActiveProfile { get; }
         IReadOnlyList<string> Profiles();
         double UiScale { get; }
+        string WeatherSource { get; }
+        void SetWeatherSource(string source);
         void SwitchProfile(string name);
         void NewProfile();
         void DuplicateProfile();
@@ -81,6 +83,15 @@ namespace CrcCompanion.Tray
                 scale.DropDownItems.Add(item);
             }
             _menu.Items.Add(scale);
+
+            var wx = new WinForms.ToolStripMenuItem("Weather source");
+            var real = new WinForms.ToolStripMenuItem("Real world (aviationweather.gov)") { Checked = _host.WeatherSource == Core.WeatherSources.Real };
+            real.Click += (_, _) => _host.SetWeatherSource(Core.WeatherSources.Real);
+            var vatsim = new WinForms.ToolStripMenuItem("VATSIM (metar.vatsim.net)") { Checked = _host.WeatherSource == Core.WeatherSources.Vatsim };
+            vatsim.Click += (_, _) => _host.SetWeatherSource(Core.WeatherSources.Vatsim);
+            wx.DropDownItems.Add(real);
+            wx.DropDownItems.Add(vatsim);
+            _menu.Items.Add(wx);
             Add("Reset view positions", _host.ResetPositions);
             Add("Open profiles folder", _host.OpenProfilesFolder);
 

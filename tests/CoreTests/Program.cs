@@ -116,6 +116,11 @@ internal static class Program
         Eq("clean name", "Z-BW_2", ProfileStore.CleanName(" z-bw_2! "));
         store.SaveSettings(new AppSettings { ActiveProfile = "ZID" });
         Eq("settings round-trip", "ZID", store.LoadSettings().ActiveProfile);
+        Eq("weather source defaults to real", WeatherSources.Real, new AppSettings().WeatherSource);
+        Eq("old settings file (no source) -> real", WeatherSources.Real, WeatherSources.Normalize(null));
+        Eq("vatsim kept", WeatherSources.Vatsim, WeatherSources.Normalize("VATSIM"));
+        File.WriteAllText(Path.Combine(dir, "settings.json"), "{\n  \"activeProfile\": \"ZDC\"\n}");
+        Eq("legacy settings.json loads as real", WeatherSources.Real, store.LoadSettings().WeatherSource);
         Directory.Delete(dir, true);
 
         // --- ERAM font (captured from CRC at FONT 2) ---

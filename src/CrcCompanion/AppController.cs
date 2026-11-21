@@ -36,7 +36,7 @@ namespace CrcCompanion
             _store = new ProfileStore(ProfileStore.DefaultRoot());
             _settings = _store.LoadSettings();
 
-            Metar = new MetarService(app.Dispatcher);
+            Metar = new MetarService(app.Dispatcher, _settings.WeatherSource);
             Metar.Updated += RefreshViews;
 
             _saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -181,6 +181,15 @@ namespace CrcCompanion
                 return null;
             }
             return name;
+        }
+
+        public string WeatherSource => Metar.Source;
+
+        public void SetWeatherSource(string source)
+        {
+            _settings.WeatherSource = WeatherSources.Normalize(source);
+            _store.SaveSettings(_settings);
+            Metar.SetSource(_settings.WeatherSource);
         }
 
         public void SetScale(double scale)

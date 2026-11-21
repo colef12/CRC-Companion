@@ -52,6 +52,15 @@ namespace CrcCompanion.Core
     public sealed class AppSettings
     {
         public string ActiveProfile { get; set; } = "DEFAULT";
+        /// <summary>Primary METAR source: "REAL" (aviationweather.gov) or "VATSIM". The other is the fallback.</summary>
+        public string WeatherSource { get; set; } = WeatherSources.Real;
+    }
+
+    public static class WeatherSources
+    {
+        public const string Real = "REAL";
+        public const string Vatsim = "VATSIM";
+        public static string Normalize(string? s) => s == Vatsim ? Vatsim : Real;
     }
 
     /// <summary>Profiles live in %APPDATA%\CRCCompanion\profiles\NAME.json.</summary>

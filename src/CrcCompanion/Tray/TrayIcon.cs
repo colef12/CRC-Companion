@@ -11,6 +11,11 @@ namespace CrcCompanion.Tray
         double UiScale { get; }
         string WeatherSource { get; }
         void SetWeatherSource(string source);
+        string Cid { get; }
+        bool AutoSwitchProfile { get; }
+        string SessionStatus { get; }
+        void SetCid();
+        void ToggleAutoSwitch();
         void SwitchProfile(string name);
         void NewProfile();
         void DuplicateProfile();
@@ -55,7 +60,13 @@ namespace CrcCompanion.Tray
         private void Rebuild()
         {
             _menu.Items.Clear();
+            _menu.Items.Add(new WinForms.ToolStripMenuItem(_host.SessionStatus) { Enabled = false });
             _menu.Items.Add(new WinForms.ToolStripMenuItem("Profile: " + _host.ActiveProfile) { Enabled = false });
+            _menu.Items.Add(new WinForms.ToolStripSeparator());
+            Add(_host.Cid.Length == 0 ? "Set VATSIM CID..." : $"VATSIM CID: {_host.Cid}...", _host.SetCid);
+            var auto = new WinForms.ToolStripMenuItem("Switch profile when I log on") { Checked = _host.AutoSwitchProfile };
+            auto.Click += (_, _) => _host.ToggleAutoSwitch();
+            _menu.Items.Add(auto);
             _menu.Items.Add(new WinForms.ToolStripSeparator());
 
             foreach (var name in _host.Profiles())

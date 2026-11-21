@@ -22,6 +22,16 @@ namespace CrcCompanion.Core
         public int Font { get; set; } = 2;
         public int Bright { get; set; } = 80;
         public List<string> Stations { get; set; } = new List<string>();
+
+        // Strip views (Inbound, In Sector, DEPT LIST)
+        /// <summary>Route characters shown on each strip.</summary>
+        public int RouteChars { get; set; } = 24;
+        /// <summary>Inbound look-ahead in minutes.</summary>
+        public int Minutes { get; set; } = 20;
+        /// <summary>In Sector: also show aircraft working another local controller.</summary>
+        public bool ShowOthers { get; set; }
+        /// <summary>DEPT LIST: include prefiled flights not yet connected.</summary>
+        public bool ShowPrefiles { get; set; } = true;
     }
 
     public sealed class SelectorSettings
@@ -39,6 +49,18 @@ namespace CrcCompanion.Core
         public SelectorSettings Selector { get; set; } = new SelectorSettings();
         public ViewSettings Altim { get; set; } = new ViewSettings { Lines = 24, Cols = 1 };
         public ViewSettings Wx { get; set; } = new ViewSettings { Lines = 5, Cols = 1 };
+        public ViewSettings Inbound { get; set; } = new ViewSettings { Lines = 20, Tearoff = false };
+        public ViewSettings InSector { get; set; } = new ViewSettings { Lines = 30, Tearoff = false };
+        public ViewSettings Dept { get; set; } = new ViewSettings { Lines = 20, Tearoff = false };
+
+        /// <summary>A copy with this profile's layout and settings but no station lists.</summary>
+        public Profile CloneLayout(string newName)
+        {
+            var p = Clone(newName);
+            p.Altim.Stations.Clear();
+            p.Wx.Stations.Clear();
+            return p;
+        }
 
         public Profile Clone(string newName)
         {
@@ -52,6 +74,10 @@ namespace CrcCompanion.Core
     public sealed class AppSettings
     {
         public string ActiveProfile { get; set; } = "DEFAULT";
+        /// <summary>VATSIM CID used to find the facility you're controlling.</summary>
+        public string Cid { get; set; } = "";
+        /// <summary>Switch to (or create) the facility's profile when you log on.</summary>
+        public bool AutoSwitchProfile { get; set; } = true;
         /// <summary>Primary METAR source: "REAL" (aviationweather.gov) or "VATSIM". The other is the fallback.</summary>
         public string WeatherSource { get; set; } = WeatherSources.Real;
     }
@@ -156,12 +182,18 @@ namespace CrcCompanion.Core
 
         public static void Sanitize(Profile p)
         {
+            if (p == null) return;
             p.UiScale = Math.Clamp(p.UiScale <= 0 ? 1.0 : p.UiScale, 0.5, 3.0);
             p.Selector ??= new SelectorSettings();
             p.Altim ??= new ViewSettings { Lines = 24 };
             p.Wx ??= new ViewSettings { Lines = 5 };
-            foreach (var v in new[] { p.Altim, p.Wx })
+            p.Inbound ??= new ViewSettings { Lines = 20, Tearoff = false };
+            p.InSector ??= new ViewSettings { Lines = 30, Tearoff = false };
+            p.Dept ??= new ViewSettings { Lines = 20, Tearoff = false };
+            foreach (var v in new[] { p.Altim, p.Wx, p.Inbound, p.InSector, p.Dept })
             {
+                v.RouteChars = Math.Clamp(v.RouteChars, Limits.RouteMin, Limits.RouteMax);
+                v.Minutes = Math.Clamp(v.Minutes, Limits.MinutesMin, Limits.MinutesMax);
                 v.Lines = Math.Clamp(v.Lines, Limits.LinesMin, Limits.LinesMax);
                 v.Cols = Math.Clamp(v.Cols, Limits.ColsMin, Limits.ColsMax);
                 v.Font = Math.Clamp(v.Font, Limits.FontMin, Limits.FontMax);
@@ -175,9 +207,11 @@ namespace CrcCompanion.Core
 
     public static class Limits
     {
-        public const int LinesMin = 1, LinesMax = 40;
+        public const int LinesMin = 1, LinesMax = 60;
         public const int ColsMin = 1, ColsMax = 6;
         public const int FontMin = 1, FontMax = 5;
         public const int BrightMin = 0, BrightMax = 100, BrightStep = 2;
+        public const int RouteMin = 0, RouteMax = 80, RouteStep = 2;
+        public const int MinutesMin = 5, MinutesMax = 60, MinutesStep = 5;
     }
 }

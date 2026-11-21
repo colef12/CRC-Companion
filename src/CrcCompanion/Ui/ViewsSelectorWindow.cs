@@ -16,6 +16,13 @@ namespace CrcCompanion.Ui
     {
         public const string AltimKey = "ALTIM SET";
         public const string WxKey = "WX REPORT";
+        public const string InboundKey = "INBND LIST";
+        public const string DeptKey = "DEPT LIST";
+        /// <summary>Not an ERAM button: drawn in its own framed row under the grid.</summary>
+        public const string InSectorKey = "IN SECTOR";
+
+        private static bool Wired(string label) =>
+            label == AltimKey || label == WxKey || label == InboundKey || label == DeptKey;
 
         private static readonly string?[,] Grid =
         {
@@ -23,7 +30,7 @@ namespace CrcCompanion.Ui
             { "DEPT LIST", "FLIGHT EVENT", "GROUP SUP", "HOLD LIST", "INBND LIST", "MRP LIST", "SAA FILTER", "UA", "WX REPORT", null },
         };
 
-        private const int CellW = 94, CellH = 32, Gap = 2, FrameT = 2;
+        private const int CellW = 94, CellH = 32, Gap = 2, FrameT = 2, ExtraGap = 4;
         private const int BarX = 1, BarW = 11, BodyX = 14, BodyY = 1;
 
         private readonly SelectorSettings _settings;
@@ -74,7 +81,7 @@ namespace CrcCompanion.Ui
                     if (label == null) continue; // gray filler cell: the gap color shows through
                     double cx = gx + FrameT + c * (CellW + Gap);
                     double cy = FrameT + r * (CellH + Gap);
-                    bool wired = label == AltimKey || label == WxKey;
+                    bool wired = Wired(label);
                     bool on = wired && _isOn(label);
                     DrawCell(p, cx, cy, label, on ? Eram.TbOn : Eram.TbOff,
                         onBody: wired ? () => _toggle(label) : (Action?)null,
@@ -82,7 +89,14 @@ namespace CrcCompanion.Ui
                 }
             }
 
-            return new Size(CellW + gridW, gridH);
+            // Companion-only row: IN SECTOR, framed like the grid, under its first column.
+            double ey = gridH + ExtraGap;
+            p.Fill(Eram.TbFrame, gx, ey, CellW + FrameT * 2, CellH + FrameT * 2);
+            bool inSectorOn = _isOn(InSectorKey);
+            DrawCell(p, gx + FrameT, ey + FrameT, InSectorKey, inSectorOn ? Eram.TbOn : Eram.TbOff,
+                onBody: () => _toggle(InSectorKey), onBar: null);
+
+            return new Size(CellW + gridW, ey + CellH + FrameT * 2);
         }
 
         private static void DrawCell(Painter p, double x, double y, string label, Brush body, Action? onBody, Action? onBar)

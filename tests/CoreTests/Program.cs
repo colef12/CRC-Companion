@@ -116,6 +116,19 @@ internal static class Program
         Eq("clean name", "Z-BW_2", ProfileStore.CleanName(" z-bw_2! "));
         store.SaveSettings(new AppSettings { ActiveProfile = "ZID" });
         Eq("settings round-trip", "ZID", store.LoadSettings().ActiveProfile);
+        // Older profile files have no strip views: they load with defaults.
+        File.WriteAllText(Path.Combine(store.ProfilesDir, "OLD.json"), "{ \"name\": \"OLD\", \"altim\": { \"stations\": [\"BOS\"] } }");
+        var legacy = store.Load("OLD");
+        Eq("legacy profile: inbound defaults", 20, legacy.Inbound.Minutes);
+        Eq("legacy profile: in-sector lines", 30, legacy.InSector.Lines);
+        Eq("legacy profile: dept prefiles on", true, legacy.Dept.ShowPrefiles);
+        Eq("legacy profile: stations kept", "BOS", string.Join(",", legacy.Altim.Stations));
+        var lay = legacy.CloneLayout("ZID");
+        Eq("clone layout: name", "ZID", lay.Name);
+        Eq("clone layout: stations cleared", 0, lay.Altim.Stations.Count);
+        Eq("clone layout: source untouched", 1, legacy.Altim.Stations.Count);
+        Eq("cid defaults empty", "", new AppSettings().Cid);
+        Eq("auto-switch defaults on", true, new AppSettings().AutoSwitchProfile);
         Eq("weather source defaults to real", WeatherSources.Real, new AppSettings().WeatherSource);
         Eq("old settings file (no source) -> real", WeatherSources.Real, WeatherSources.Normalize(null));
         Eq("vatsim kept", WeatherSources.Vatsim, WeatherSources.Normalize("VATSIM"));
@@ -148,6 +161,8 @@ internal static class Program
         Eq("WX REPORT label ink", 292, Ink("WX REPORT"));
         Eq("VIEWS label ink", 176, Ink("VIEWS"));
         Check("CRR label present", ToolbarLabels.Has("CRR"));
+
+        TrafficTests.Run(Check, (n, e, a) => Check(n, Equals(e, a), $"expected [{e}] got [{a}]"));
 
         Console.WriteLine($"\n{_pass} passed, {_fail} failed");
         return _fail == 0 ? 0 : 1;

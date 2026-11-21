@@ -31,6 +31,8 @@ namespace CrcCompanion.Ui
         private readonly StripKind _kind;
         private readonly IStripSource _source;
         private int _scroll;
+        /// <summary>Callsigns highlighted by clicking; kept by callsign so the highlight follows the flight as lists re-sort.</summary>
+        private readonly HashSet<string> _highlighted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public StripViewWindow(IViewHost host, ViewSettings settings, StripKind kind, IStripSource source)
             : base(host, settings, kind switch { StripKind.Inbound => "INBND LIST", StripKind.InSector => "IN SECTOR", _ => "DEPT LIST" })
@@ -74,15 +76,18 @@ namespace CrcCompanion.Ui
             Surface.Refresh();
         }
 
-        /// <summary>Text lines for the body; headings are marked so they can be spaced like WX report breaks.</summary>
-        private List<(string Text, bool Heading)> BuildLines()
+        /// <summary>
+        /// Text lines for the body. Headings are marked so they can be spaced like WX report breaks;
+        /// Key is the strip's callsign (empty for headings and status lines).
+        /// </summary>
+        private List<(string Text, bool Heading, string Key)> BuildLines()
         {
-            var lines = new List<(string, bool)>();
+            var lines = new List<(string, bool, string)>();
             var t = _source.Traffic;
             var f = _source.Facility;
             if (t == null || f == null)
             {
-                lines.Add((_source.StatusText, false));
+                lines.Add((_source.StatusText, false, ""));
                 return lines;
             }
 
@@ -91,14 +96,14 @@ namespace CrcCompanion.Ui
             switch (_kind)
             {
                 case StripKind.Inbound:
-                    foreach (var i in t.Inbound) lines.Add((StripFormat.Inbound(i, route, connected), false));
+                    foreach (var i in t.Inbound) lines.Add((StripFormat.Inbound(i, route, connected), false, i.Callsign));
                     break;
                 case StripKind.InSector:
                     foreach (var i in t.InSector)
                     {
                         bool other = i.Freq != FreqStatus.Mine && i.Freq != FreqStatus.None;
                         if (other && !Settings.ShowOthers) continue;
-                        lines.Add((StripFormat.InSector(i, route, connected, f.DisplayAirport), false));
+                        lines.Add((StripFormat.InSector(i, route, connected, f.DisplayAirport), false, i.Callsign));
                     }
                     break;
                 case StripKind.Departures:
@@ -107,13 +112,19 @@ namespace CrcCompanion.Ui
                     {
                         if (i.IsPrefile && !Settings.ShowPrefiles) continue;
                         var apt = f.DisplayAirport(i.Departure);
-                        if (apt != group) { lines.Add((apt, true)); group = apt; }
-                        lines.Add((StripFormat.Departure(i, route, f.DisplayAirport), false));
+                        if (apt != group) { lines.Add((apt, true, "")); group = apt; }
+                        lines.Add((StripFormat.Departure(i, route, f.DisplayAirport), false, i.Callsign));
                     }
                     break;
             }
-            if (lines.Count == 0) lines.Add(("NONE", false));
+            if (lines.Count == 0) lines.Add(("NONE", false, ""));
             return lines;
+        }
+
+        private void ToggleHighlight(string callsign)
+        {
+            if (!_highlighted.Remove(callsign)) _highlighted.Add(callsign);
+            Surface.Refresh();
         }
 
         protected override Size PaintBody(Painter p, double x0, double y0)
@@ -144,7 +155,14 @@ namespace CrcCompanion.Ui
                 var tb = TextBrush;
                 for (int v = 0; v < count; v++)
                 {
-                    var text = lines[_scroll + v].Text;
+                    var (text, _, key) = lines[_scroll + v];
+                    // Line box: the glyphs plus 3 px above and below (17 px at FONT 2, so boxes touch).
+                    double boxY = y0 + tops[v] + m.GlyphTopInRow - 3, boxH = pitch;
+                    if (key.Length > 0)
+                    {
+                        if (_highlighted.Contains(key)) p.Fill(Eram.Highlight, x0 + 1, boxY, width - 2, boxH);
+                        p.Hit(x0, boxY, width, boxH, _ => ToggleHighlight(key));
+                    }
                     if (v == count - 1 && _scroll + count < lines.Count) text = text.PadRight(chars - 1).Substring(0, chars - 1) + ">";
                     p.Text(text, x0 + LeftPad, y0 + tops[v] + m.GlyphTopInRow, m, tb);
                 }

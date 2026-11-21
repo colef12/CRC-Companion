@@ -17,6 +17,8 @@ namespace CrcCompanion.Ui
         public static readonly Brush Marker = Solid(0x9F, 0xA3, 0x09);
         public static readonly Brush MarkerOutline = Solid(0x83, 0x83, 0x83);
         public static readonly Brush ScrollGray = Solid(0x91, 0x91, 0x91);
+        /// <summary>Selected-line bar, as in CRC's Check List view.</summary>
+        public static readonly Brush Highlight = Solid(0x4B, 0x4B, 0x4B);
 
         // Menus
         public static readonly Brush MenuTitle = Solid(0x99, 0x99, 0x99);

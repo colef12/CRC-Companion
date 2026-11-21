@@ -32,6 +32,9 @@ namespace CrcCompanion.Core
         public bool ShowOthers { get; set; }
         /// <summary>DEPT LIST: include prefiled flights not yet connected.</summary>
         public bool ShowPrefiles { get; set; } = true;
+
+        /// <summary>STATUS: the text you typed, one entry per line. Null = defaults.</summary>
+        public List<string>? TextLines { get; set; }
     }
 
     public sealed class SelectorSettings
@@ -52,6 +55,7 @@ namespace CrcCompanion.Core
         public ViewSettings Inbound { get; set; } = new ViewSettings { Lines = 20, Tearoff = false };
         public ViewSettings InSector { get; set; } = new ViewSettings { Lines = 30, Tearoff = false };
         public ViewSettings Dept { get; set; } = new ViewSettings { Lines = 20, Tearoff = false };
+        public ViewSettings Status { get; set; } = new ViewSettings { Tearoff = false };
 
         /// <summary>A copy with this profile's layout and settings but no station lists.</summary>
         public Profile CloneLayout(string newName)
@@ -190,7 +194,8 @@ namespace CrcCompanion.Core
             p.Inbound ??= new ViewSettings { Lines = 20, Tearoff = false };
             p.InSector ??= new ViewSettings { Lines = 30, Tearoff = false };
             p.Dept ??= new ViewSettings { Lines = 20, Tearoff = false };
-            foreach (var v in new[] { p.Altim, p.Wx, p.Inbound, p.InSector, p.Dept })
+            p.Status ??= new ViewSettings { Tearoff = false };
+            foreach (var v in new[] { p.Altim, p.Wx, p.Inbound, p.InSector, p.Dept, p.Status })
             {
                 v.RouteChars = Math.Clamp(v.RouteChars, Limits.RouteMin, Limits.RouteMax);
                 v.Minutes = Math.Clamp(v.Minutes, Limits.MinutesMin, Limits.MinutesMax);

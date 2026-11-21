@@ -122,6 +122,7 @@ internal static class Program
         Eq("legacy profile: inbound defaults", 20, legacy.Inbound.Minutes);
         Eq("legacy profile: in-sector lines", 30, legacy.InSector.Lines);
         Eq("legacy profile: dept prefiles on", true, legacy.Dept.ShowPrefiles);
+        Eq("legacy profile: status text defaults (null)", null, legacy.Status.TextLines);
         Eq("legacy profile: stations kept", "BOS", string.Join(",", legacy.Altim.Stations));
         var lay = legacy.CloneLayout("ZID");
         Eq("clone layout: name", "ZID", lay.Name);

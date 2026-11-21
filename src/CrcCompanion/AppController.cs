@@ -32,6 +32,7 @@ namespace CrcCompanion
         private StripViewWindow? _inbound;
         private StripViewWindow? _inSector;
         private StripViewWindow? _dept;
+        private StatusViewWindow? _status;
 
         /// <summary>Callsign seen on the last poll, to auto-switch only when you log on or change position.</summary>
         private string _lastSessionCallsign = "";
@@ -98,6 +99,7 @@ namespace CrcCompanion
             _inbound = new StripViewWindow(this, _profile.Inbound, StripKind.Inbound, this);
             _inSector = new StripViewWindow(this, _profile.InSector, StripKind.InSector, this);
             _dept = new StripViewWindow(this, _profile.Dept, StripKind.Departures, this);
+            _status = new StatusViewWindow(this, _profile.Status);
             foreach (var v in Views) { v.SetScale(UiScale); if (v.Settings.Visible) ShowView(v); }
 
             UpdateMetarStations();
@@ -106,7 +108,7 @@ namespace CrcCompanion
         }
 
         private IEnumerable<ListViewWindow> Views =>
-            new ListViewWindow?[] { _altim, _wx, _inbound, _inSector, _dept }.Where(v => v != null).Select(v => v!);
+            new ListViewWindow?[] { _altim, _wx, _inbound, _inSector, _dept, _status }.Where(v => v != null).Select(v => v!);
 
         private static (int X, int Y) Place(int? x, int? y, int defX, int defY)
         {
@@ -123,6 +125,7 @@ namespace CrcCompanion
             if (v == _wx) return (wa.Left + 360, wa.Top + 160);
             if (v == _inbound) return (wa.Left + 760, wa.Top + 160);
             if (v == _inSector) return (wa.Left + 760, wa.Top + 520);
+            if (v == _status) return (wa.Right - 360, wa.Top + 160);
             return (wa.Left + 40, wa.Top + 520);
         }
 
@@ -138,8 +141,8 @@ namespace CrcCompanion
         private void CloseWindows()
         {
             foreach (var v in Views) v.CloseChildren();
-            foreach (var w in new Window?[] { _altim, _wx, _inbound, _inSector, _dept, _selector }) w?.Close();
-            _altim = null; _wx = null; _inbound = null; _inSector = null; _dept = null; _selector = null;
+            foreach (var w in new Window?[] { _altim, _wx, _inbound, _inSector, _dept, _status, _selector }) w?.Close();
+            _altim = null; _wx = null; _inbound = null; _inSector = null; _dept = null; _status = null; _selector = null;
         }
 
         public IReadOnlyList<string> Profiles() => _store.List();
@@ -230,7 +233,7 @@ namespace CrcCompanion
         public void ResetPositions()
         {
             _profile.Selector.X = _profile.Selector.Y = null;
-            foreach (var s in new[] { _profile.Altim, _profile.Wx, _profile.Inbound, _profile.InSector, _profile.Dept })
+            foreach (var s in new[] { _profile.Altim, _profile.Wx, _profile.Inbound, _profile.InSector, _profile.Dept, _profile.Status })
                 s.X = s.Y = null;
             SaveNow();
             LoadProfile(_profile.Name);
@@ -377,6 +380,7 @@ namespace CrcCompanion
             ViewsSelectorWindow.InboundKey => _inbound,
             ViewsSelectorWindow.DeptKey => _dept,
             ViewsSelectorWindow.InSectorKey => _inSector,
+            ViewsSelectorWindow.StatusKey => _status,
             _ => null,
         };
 

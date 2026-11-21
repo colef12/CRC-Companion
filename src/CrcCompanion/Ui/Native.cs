@@ -61,6 +61,13 @@ namespace CrcCompanion.Ui
             SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(ex));
         }
 
+        public static void SetNoActivate(IntPtr hwnd, bool on)
+        {
+            var ex = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
+            ex = on ? ex | WS_EX_NOACTIVATE : ex & ~WS_EX_NOACTIVATE;
+            SetWindowLongPtr(hwnd, GWL_EXSTYLE, new IntPtr(ex));
+        }
+
         public static void MoveWindow(IntPtr hwnd, int x, int y) =>
             SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }

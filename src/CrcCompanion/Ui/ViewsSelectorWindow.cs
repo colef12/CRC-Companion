@@ -20,14 +20,16 @@ namespace CrcCompanion.Ui
         public const string DeptKey = "DEPT LIST";
         /// <summary>Not an ERAM button: drawn in its own framed row under the grid.</summary>
         public const string InSectorKey = "IN SECTOR";
+        /// <summary>Companion button placed in the grid's blank cell (row 2, column 10).</summary>
+        public const string StatusKey = "STATUS";
 
         private static bool Wired(string label) =>
-            label == AltimKey || label == WxKey || label == InboundKey || label == DeptKey;
+            label == AltimKey || label == WxKey || label == InboundKey || label == DeptKey || label == StatusKey;
 
         private static readonly string?[,] Grid =
         {
             { "ALTIM SET", "AUTO HO INHIB", "CFR", "CODE", "CONFLCT ALERT", "CPDLC ADV", "CPDLC HIST", "CPDLC MSGOUT", "CPDLC TOC SET", "CRR" },
-            { "DEPT LIST", "FLIGHT EVENT", "GROUP SUP", "HOLD LIST", "INBND LIST", "MRP LIST", "SAA FILTER", "UA", "WX REPORT", null },
+            { "DEPT LIST", "FLIGHT EVENT", "GROUP SUP", "HOLD LIST", "INBND LIST", "MRP LIST", "SAA FILTER", "UA", "WX REPORT", "STATUS" },
         };
 
         private const int CellW = 94, CellH = 32, Gap = 2, FrameT = 2, ExtraGap = 4;
@@ -78,7 +80,7 @@ namespace CrcCompanion.Ui
                 for (int c = 0; c < 10; c++)
                 {
                     var label = Grid[r, c];
-                    if (label == null) continue; // gray filler cell: the gap color shows through
+                    if (label == null) continue;
                     double cx = gx + FrameT + c * (CellW + Gap);
                     double cy = FrameT + r * (CellH + Gap);
                     bool wired = Wired(label);

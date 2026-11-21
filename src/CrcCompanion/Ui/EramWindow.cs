@@ -26,6 +26,40 @@ namespace CrcCompanion.Ui
         /// <summary>Raised after the user places the window at a new position.</summary>
         public event Action<EramWindow>? Repositioned;
 
+        /// <summary>Raised when typing mode ends (focus left the window, or EndKeyboard was called).</summary>
+        public event Action? KeyboardEnded;
+
+        private IntPtr _returnFocus;
+        public bool KeyboardActive { get; private set; }
+
+        /// <summary>
+        /// Typing mode: lets this window take keyboard focus (normally it never does), remembering
+        /// which window had focus (normally CRC) to hand it back afterwards.
+        /// </summary>
+        public void BeginKeyboard()
+        {
+            if (KeyboardActive || Hwnd == IntPtr.Zero) return;
+            _returnFocus = Native.GetForegroundWindow();
+            Native.SetNoActivate(Hwnd, false);
+            KeyboardActive = true;
+            Surface.Focusable = true;
+            Activate();
+            Surface.Focus();
+            System.Windows.Input.Keyboard.Focus(Surface);
+        }
+
+        /// <summary>Leaves typing mode and returns focus to the window that had it.</summary>
+        public void EndKeyboard()
+        {
+            if (!KeyboardActive) return;
+            KeyboardActive = false;
+            Surface.Focusable = false;
+            Native.SetNoActivate(Hwnd, true);
+            KeyboardEnded?.Invoke();
+            if (_returnFocus != IntPtr.Zero && _returnFocus != Hwnd) Native.SetForegroundWindow(_returnFocus);
+            _returnFocus = IntPtr.Zero;
+        }
+
         public EramWindow()
         {
             WindowStyle = WindowStyle.None;
@@ -48,6 +82,8 @@ namespace CrcCompanion.Ui
                 Native.MakeNoActivate(Hwnd);
                 ApplyTransform();
             };
+
+            Deactivated += (_, _) => EndKeyboard();
 
             _moveTimer = new DispatcherTimer(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(10) };
             _moveTimer.Tick += OnMoveTick;

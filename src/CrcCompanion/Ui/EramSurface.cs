@@ -19,6 +19,9 @@ namespace CrcCompanion.Ui
         public Func<Painter, Size>? Paint { get; set; }
         public Func<bool>? ClicksSuppressed { get; set; }
         public Action<int, Point>? Wheel { get; set; }
+        /// <summary>Key handler while the window has keyboard focus (typing mode). Return true if handled.</summary>
+        public Func<Key, ModifierKeys, bool>? KeyHandler { get; set; }
+        public Action<string>? TextHandler { get; set; }
 
         public EramSurface()
         {
@@ -71,6 +74,19 @@ namespace CrcCompanion.Ui
                     return;
                 }
             }
+        }
+
+        protected override void OnPreviewKeyDown(KeyEventArgs e)
+        {
+            base.OnPreviewKeyDown(e);
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (KeyHandler != null && KeyHandler(key, Keyboard.Modifiers)) e.Handled = true;
+        }
+
+        protected override void OnTextInput(TextCompositionEventArgs e)
+        {
+            base.OnTextInput(e);
+            if (TextHandler != null && !string.IsNullOrEmpty(e.Text)) { TextHandler(e.Text); e.Handled = true; }
         }
 
         protected override void OnMouseWheel(MouseWheelEventArgs e)

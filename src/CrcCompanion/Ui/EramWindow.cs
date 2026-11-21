@@ -76,7 +76,7 @@ namespace CrcCompanion.Ui
             }
         }
 
-        public Native.RECT ScreenRect
+        internal Native.RECT ScreenRect
         {
             get
             {

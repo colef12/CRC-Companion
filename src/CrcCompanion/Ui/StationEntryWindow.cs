@@ -40,7 +40,7 @@ namespace CrcCompanion.Ui
             UseLayoutRounding = true;
             TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
 
-            const double fs = Eram.MenuFontSize;
+            const double fs = Eram.EntryFontSize;
             const double width = 340;
 
             var titleBar = new Border
@@ -50,7 +50,7 @@ namespace CrcCompanion.Ui
                 {
                     Text = title,
                     Foreground = Eram.MenuText,
-                    FontFamily = Eram.Family,
+                    FontFamily = Eram.EntryFamily,
                     FontSize = fs,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     Margin = new Thickness(0, 1, 0, 1),
@@ -64,7 +64,7 @@ namespace CrcCompanion.Ui
                 CaretBrush = Eram.TextGray(80),
                 BorderThickness = new Thickness(0, 0, 0, 1),
                 BorderBrush = Eram.ViewBorder,
-                FontFamily = Eram.Family,
+                FontFamily = Eram.EntryFamily,
                 FontSize = fs,
                 CharacterCasing = CharacterCasing.Upper,
                 Padding = new Thickness(3, 2, 3, 2),
@@ -74,7 +74,7 @@ namespace CrcCompanion.Ui
             _feedback = new TextBlock
             {
                 Foreground = Eram.TextGray(80),
-                FontFamily = Eram.Family,
+                FontFamily = Eram.EntryFamily,
                 FontSize = fs,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(3, 2, 3, 0),
@@ -84,7 +84,7 @@ namespace CrcCompanion.Ui
             _list = new TextBlock
             {
                 Foreground = Eram.ScrollGray,
-                FontFamily = Eram.Family,
+                FontFamily = Eram.EntryFamily,
                 FontSize = fs,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(3, 2, 3, 3),

@@ -7,12 +7,14 @@ using System.Windows.Media;
 namespace CrcCompanion.Ui
 {
     /// <summary>
-    /// Draws an ERAM element in code. The same Paint function runs for measuring (no DrawingContext)
-    /// and rendering, so the window size, the drawing and the click areas always agree.
+    /// Draws an ERAM element in code. Units are screen pixels (the window applies a transform
+    /// that undoes Windows display scaling, as CRC does). The same Paint function runs for
+    /// measuring (no DrawingContext) and rendering, so size, drawing and click areas always agree.
     /// </summary>
     public sealed class EramSurface : FrameworkElement
     {
         private readonly List<(Rect Rect, Action<MouseButton> Action)> _hits = new List<(Rect, Action<MouseButton>)>();
+        private readonly List<(double Y, double H, object Tag)> _tags = new List<(double, double, object)>();
 
         public Func<Painter, Size>? Paint { get; set; }
         public Func<bool>? ClicksSuppressed { get; set; }
@@ -22,12 +24,8 @@ namespace CrcCompanion.Ui
         {
             SnapsToDevicePixels = true;
             UseLayoutRounding = true;
-            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
-            TextOptions.SetTextRenderingMode(this, TextRenderingMode.Aliased);
             RenderOptions.SetEdgeMode(this, EdgeMode.Aliased);
         }
-
-        private readonly List<(double Y, double H, object Tag)> _tags = new List<(double, double, object)>();
 
         internal void AddHit(Rect r, Action<MouseButton> a) => _hits.Add((r, a));
         internal void AddTag(double y, double h, object tag) => _tags.Add((y, h, tag));
@@ -46,10 +44,8 @@ namespace CrcCompanion.Ui
             InvalidateVisual();
         }
 
-        private double Ppd => VisualTreeHelper.GetDpi(this).PixelsPerDip;
-
         protected override Size MeasureOverride(Size availableSize) =>
-            Paint?.Invoke(new Painter(null, this, Ppd)) ?? new Size(1, 1);
+            Paint?.Invoke(new Painter(null, this)) ?? new Size(1, 1);
 
         protected override Size ArrangeOverride(Size finalSize) => finalSize;
 
@@ -57,7 +53,7 @@ namespace CrcCompanion.Ui
         {
             _hits.Clear();
             _tags.Clear();
-            Paint?.Invoke(new Painter(dc, this, Ppd));
+            Paint?.Invoke(new Painter(dc, this));
         }
 
         protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -85,27 +81,21 @@ namespace CrcCompanion.Ui
         }
     }
 
-    /// <summary>Thin drawing helper. Every call is a no-op during the measure pass.</summary>
+    /// <summary>Drawing helper in screen-pixel units. Every call is a no-op during the measure pass.</summary>
     public sealed class Painter
     {
         private readonly DrawingContext? _dc;
         private readonly EramSurface _surface;
-        public double Ppd { get; }
         public bool Drawing => _dc != null;
 
-        internal Painter(DrawingContext? dc, EramSurface surface, double ppd)
+        internal Painter(DrawingContext? dc, EramSurface surface)
         {
             _dc = dc;
             _surface = surface;
-            Ppd = ppd;
         }
 
-        /// <summary>A painter with the same metrics that draws nothing (for sizing sub-areas).</summary>
-        public Painter MeasureOnly() => new Painter(null, _surface, Ppd);
-
-        public double CharW(double size) => Eram.CharWidth(size, Ppd);
-        public double LineH(double size) => Eram.LineHeight(size);
-        public double TextW(string s, double size) => s.Length * CharW(size);
+        /// <summary>A painter that draws nothing (for sizing sub-areas).</summary>
+        public Painter MeasureOnly() => new Painter(null, _surface);
 
         public void Fill(Brush b, double x, double y, double w, double h)
         {
@@ -121,11 +111,44 @@ namespace CrcCompanion.Ui
             Fill(b, x + w - t, y, t, h);
         }
 
+        /// <summary>ERAM text: x = left edge of the first character cell, top = top of the caps.</summary>
+        public void Text(string s, double x, double top, EramMetrics m, Brush b)
+        {
+            if (_dc == null || string.IsNullOrEmpty(s)) return;
+            double scale = m.S;
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (s[i] == ' ') continue;
+                double ox = x + i * m.Cell;
+                foreach (var r in EramFont.Runs(s[i]))
+                {
+                    double x0 = Math.Round(r.X * scale), x1 = Math.Round((r.X + r.W) * scale);
+                    double y0 = Math.Round(r.Y * scale), y1 = Math.Round((r.Y + r.H) * scale);
+                    Fill(b, ox + x0, top + y0, Math.Max(1, x1 - x0), Math.Max(1, y1 - y0));
+                }
+            }
+        }
+
+        public void TextCentered(string s, double x, double w, double top, EramMetrics m, Brush b) =>
+            Text(s, x + Math.Floor((w - s.Length * m.Cell) / 2), top, m, b);
+
+        /// <summary>Draws pre-captured ink runs (toolbar labels) at an origin.</summary>
+        public void Runs(EramFont.Run[] runs, double x, double y, Brush b)
+        {
+            foreach (var r in runs) Fill(b, x + r.X, y + r.Y, r.W, r.H);
+        }
+
+        /// <summary>Underlines n characters starting at column col of text drawn at x / top.</summary>
+        public void Underline(double x, double top, EramMetrics m, int col, int n, Brush b)
+        {
+            Fill(b, x + col * m.Cell + 1, top + m.Cap + 2, n * m.Cell - 2, 2);
+        }
+
         /// <summary>Filled triangle centered in a box, pointing up or down.</summary>
         public void Triangle(Brush b, double x, double y, double w, double h, bool up)
         {
             if (_dc == null) return;
-            double s = Math.Min(w, h) * 0.5, cx = x + w / 2, cy = y + h / 2;
+            double s = Math.Floor(Math.Min(w, h) * 0.5), cx = Math.Floor(x + w / 2), cy = Math.Floor(y + h / 2);
             var g = new StreamGeometry();
             using (var ctx = g.Open())
             {
@@ -144,28 +167,6 @@ namespace CrcCompanion.Ui
             }
             g.Freeze();
             _dc.DrawGeometry(b, null, g);
-        }
-
-        /// <summary>Draws text left-aligned at x, vertically centered in a row of height rowH starting at y.</summary>
-        public void Text(string s, double x, double y, double size, Brush b, double rowH)
-        {
-            if (_dc == null || string.IsNullOrEmpty(s)) return;
-            var ft = Eram.Format(s, size, b, Ppd);
-            _dc.DrawText(ft, new Point(Math.Round(x), Math.Round(y + (rowH - ft.Height) / 2)));
-        }
-
-        public void TextCentered(string s, double x, double y, double w, double size, Brush b, double rowH)
-        {
-            var tw = TextW(s, size);
-            Text(s, x + (w - tw) / 2, y, size, b, rowH);
-        }
-
-        /// <summary>Underlines n characters starting at character column col of text drawn at x.</summary>
-        public void Underline(double x, double y, double rowH, int col, int n, double size, Brush b)
-        {
-            var cw = CharW(size);
-            var baseY = Math.Round(y + rowH - Math.Max(2, rowH * 0.12));
-            Fill(b, Math.Round(x + col * cw), baseY, Math.Round(n * cw), 1);
         }
 
         public void Hit(double x, double y, double w, double h, Action<MouseButton> a)

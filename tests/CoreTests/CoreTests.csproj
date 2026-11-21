@@ -8,5 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\CrcCompanion\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\CrcCompanion\Ui\EramFont*.cs" Link="Ui\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\CrcCompanion\Ui\ToolbarLabels*.cs" Link="Ui\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

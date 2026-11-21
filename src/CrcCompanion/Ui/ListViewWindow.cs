@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Windows;
-using System.Windows.Input;
 using CrcCompanion.Core;
 using CrcCompanion.Services;
 
@@ -19,8 +17,9 @@ namespace CrcCompanion.Ui
     }
 
     /// <summary>
-    /// Shared ERAM list view chrome: title bar "M | TITLE | -", body, optional border,
-    /// O/T background, M menu, station entry and delete popups.
+    /// Shared ERAM list-view chrome, measured from CRC at FONT 2 (screen pixels):
+    /// 1 px border, 17 px title bar with 23 px "M" and "-" cells, 1 px rule, 8 px body padding,
+    /// 21 px rows. Also owns the M menu, the station entry box and the delete popup.
     /// </summary>
     public abstract class ListViewWindow : EramWindow
     {
@@ -33,7 +32,14 @@ namespace CrcCompanion.Ui
         private MenuWindow? _popup;
         private StationEntryWindow? _entry;
 
-        protected const double Pad = 4;
+        /// <summary>Gap between the left border and the first marker.</summary>
+        protected const int LeftPad = 6;
+        /// <summary>Gap between a marker and its text, and after each entry's text.</summary>
+        protected const int EntryGap = 11;
+        /// <summary>Extra space after the last column, before the right border.</summary>
+        protected const int RightPad = 13;
+        /// <summary>Body padding above the first row and below the last.</summary>
+        protected const int BodyPad = 8;
 
         protected ListViewWindow(IViewHost host, ViewSettings settings, string title)
         {
@@ -41,7 +47,7 @@ namespace CrcCompanion.Ui
             Settings = settings;
             ViewTitle = title;
             Surface.Paint = Paint;
-            Surface.Wheel = (d, pos) => OnBodyWheel(d);
+            Surface.Wheel = (d, _) => OnBodyWheel(d);
             Repositioned += _ => SavePosition();
             Closed += (_, _) => CloseChildren();
         }
@@ -67,45 +73,57 @@ namespace CrcCompanion.Ui
             _entry?.Close();
         }
 
-        protected double FontPx => Eram.FontSize(Settings.Font);
+        protected EramMetrics M => new EramMetrics(Settings.Font);
         protected System.Windows.Media.Brush TextBrush => Eram.TextGray(Settings.Bright);
 
-        /// <summary>Measures (and draws, when painting) the body. Returns its size.</summary>
+        /// <summary>
+        /// Paints the body (rows only, not its padding) with its top-left content corner at (x, y),
+        /// where x is the inner left edge (just inside the border). Returns the content size,
+        /// width including its own right padding.
+        /// </summary>
         protected abstract Size PaintBody(Painter p, double x, double y);
 
         protected virtual void OnBodyWheel(int delta) { }
 
         protected abstract IReadOnlyList<MenuRow> BuildMenuRows();
 
+        /// <summary>Draws one outlined tear-off marker with its top-left at (x, y).</summary>
+        protected void DrawMarker(Painter p, double x, double y)
+        {
+            var m = M;
+            p.Fill(Eram.MarkerOutline, x, y, m.MarkerW, m.MarkerH);
+            p.Fill(Eram.Marker, x + 1, y + 1, m.MarkerW - 2, m.MarkerH - 2);
+        }
+
         private Size Paint(Painter p)
         {
-            double fs = FontPx, cw = p.CharW(fs), lh = p.LineH(fs);
-            double th = lh + 2;            // title bar height
-            double cellW = cw + 8;         // M and - cells
-            double bodyY = 1 + th + 1;
+            var m = M;
+            int th = m.TitleH, box = m.BoxW;
+            double bodyTop = 2 + th;                 // border + title + rule
 
-            var body = PaintBody(p.MeasureOnly(), 1, bodyY);
-            double minW = 2 + cellW * 2 + 2 + p.TextW(ViewTitle, fs) + 16;
-            double w = Math.Max(minW, body.Width + 2);
-            double h = bodyY + body.Height + 1;
+            var body = PaintBody(p.MeasureOnly(), 1, bodyTop + BodyPad);
+            double minW = 2 + box * 2 + 2 + m.TextWidth(ViewTitle.Length) + 2 * m.Cell;
+            double w = Math.Max(minW, 1 + body.Width + 1);
+            double h = bodyTop + BodyPad + body.Height + BodyPad + 1;
 
-            // Background (drawn first, body painted on top)
             p.Fill(Settings.Opaque ? Eram.Black : Eram.HalfBlack, 0, 0, w, h);
 
-            // Title bar
+            // Title bar: [M][   TITLE   ][-]
             var tb = TextBrush;
-            p.TextCentered("M", 1, 1, cellW, fs, tb, th);
-            p.Fill(Eram.ViewBorder, 1 + cellW, 1, 1, th);
-            p.TextCentered(ViewTitle, 2 + cellW, 1, w - 4 - cellW * 2, fs, tb, th);
-            p.Fill(Eram.ViewBorder, w - 2 - cellW, 1, 1, th);
-            p.TextCentered("-", w - 1 - cellW, 1, cellW, fs, tb, th);
+            double gt = 1 + m.GlyphTopInTitle;
+            p.TextCentered("M", 1, box, gt, m, tb);
+            p.Fill(Eram.ViewBorder, 1 + box, 1, 1, th);
+            double titleX = 2 + box, titleW = w - 4 - box * 2;
+            p.TextCentered(ViewTitle, titleX, titleW, gt, m, tb);
+            p.Fill(Eram.ViewBorder, w - 2 - box, 1, 1, th);
+            p.TextCentered("-", w - 1 - box, box, gt, m, tb);
             p.Fill(Eram.ViewBorder, 1, 1 + th, w - 2, 1);
 
-            p.Hit(1, 1, cellW, th, _ => ToggleMenu());
-            p.Hit(2 + cellW, 1, w - 4 - cellW * 2, th, _ => BeginReposition());
-            p.Hit(w - 1 - cellW, 1, cellW, th, _ => Host.SetViewVisible(this, false));
+            p.Hit(1, 1, box, th, _ => ToggleMenu());
+            p.Hit(titleX, 1, titleW, th, _ => BeginReposition());
+            p.Hit(w - 1 - box, 1, box, th, _ => Host.SetViewVisible(this, false));
 
-            if (p.Drawing) PaintBody(p, 1, bodyY);
+            if (p.Drawing) PaintBody(p, 1, bodyTop + BodyPad);
 
             if (Settings.Border) p.Frame(Eram.ViewBorder, 0, 0, w, h, 1);
             return new Size(w, h);
@@ -116,12 +134,14 @@ namespace CrcCompanion.Ui
         public void ToggleMenu()
         {
             if (_menu != null) { _menu.Close(); return; }
-            var rows = BuildMenuRows();
-            _menu = new MenuWindow(MenuTitle, rows);
+            _menu = new MenuWindow(MenuTitle, BuildMenuRows());
             _menu.SetScale(Host.UiScale);
             _menu.Closed += (_, _) => _menu = null;
             var r = ScreenRect;
-            _menu.ShowAt(r.Right + 4, r.Top);
+            // CRC opens the menu against the view's left edge, top-aligned.
+            _menu.ShowAt(r.Left, r.Top);
+            var mr = _menu.ScreenRect;
+            _menu.MoveTo(r.Left - (mr.Right - mr.Left), r.Top);
         }
 
         protected List<MenuRow> CommonRowsHead() => new List<MenuRow>
@@ -184,7 +204,7 @@ namespace CrcCompanion.Ui
             popup.ShowAt(c.X + 8, c.Y + 8);
         }
 
-        /// <summary>Text for station state shared by both views.</summary>
+        /// <summary>Station state shared by both views.</summary>
         protected (string Time, MetarReport? Report, bool Fetched, bool Stale, bool Expired) StationState(string id, DateTime now)
         {
             var fetched = Host.Metar.HasFetched(id);

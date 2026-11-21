@@ -46,16 +46,38 @@ namespace CrcCompanion.Ui
             {
                 Hwnd = new WindowInteropHelper(this).Handle;
                 Native.MakeNoActivate(Hwnd);
+                ApplyTransform();
             };
 
             _moveTimer = new DispatcherTimer(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(10) };
             _moveTimer.Tick += OnMoveTick;
         }
 
+        private double _uiScale = 1.0;
+
+        /// <summary>
+        /// Sets the size multiplier. 1.0 = one drawing unit per screen pixel, which is how CRC
+        /// draws regardless of Windows display scaling.
+        /// </summary>
         public void SetScale(double scale)
         {
-            Surface.LayoutTransform = Math.Abs(scale - 1.0) < 0.001 ? Transform.Identity : new ScaleTransform(scale, scale);
+            _uiScale = scale;
+            ApplyTransform();
+        }
+
+        private void ApplyTransform()
+        {
+            double dpi = Hwnd != IntPtr.Zero ? VisualTreeHelper.GetDpi(this).DpiScaleX : 1.0;
+            if (dpi <= 0) dpi = 1.0;
+            double s = _uiScale / dpi;
+            Surface.LayoutTransform = Math.Abs(s - 1.0) < 0.0001 ? Transform.Identity : new ScaleTransform(s, s);
             Surface.Refresh();
+        }
+
+        protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+        {
+            base.OnDpiChanged(oldDpi, newDpi);
+            ApplyTransform();
         }
 
         /// <summary>Shows the window at a screen position in physical pixels.</summary>

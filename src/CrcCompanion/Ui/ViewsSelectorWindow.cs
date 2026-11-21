@@ -1,13 +1,15 @@
 using System;
 using System.Windows;
+using System.Windows.Media;
 using CrcCompanion.Core;
 
 namespace CrcCompanion.Ui
 {
     /// <summary>
-    /// Copy of CRC's ERAM VIEWS Toolbar menu (live capture, Nov 21 2026).
-    /// Geometry in DIPs at 100%: cell 94 x 32 (1 px border, 11 px tear-off bar, 2 px border,
-    /// 79 px body, 1 px border), 2 px gaps, 2 px gold frame around the 2 x 10 grid.
+    /// Copy of CRC's ERAM VIEWS Toolbar menu, in screen pixels (live capture, Nov 21 2026).
+    /// Cell 94 x 32: 1 px border, 11 px tear-off bar, 2 px border, 79 px body, 1 px border.
+    /// 2 px gaps, 2 px gold frame around the 2 x 10 grid; the VIEWS button sits left of the frame.
+    /// Label pixels are drawn from the capture (ToolbarLabels), so they match exactly.
     /// Only ALTIM SET and WX REPORT are wired; the rest do nothing, as in CRC.
     /// </summary>
     public sealed class ViewsSelectorWindow : EramWindow
@@ -21,29 +23,8 @@ namespace CrcCompanion.Ui
             { "DEPT LIST", "FLIGHT EVENT", "GROUP SUP", "HOLD LIST", "INBND LIST", "MRP LIST", "SAA FILTER", "UA", "WX REPORT", null },
         };
 
-        /// <summary>Two-line labels exactly as CRC splits them.</summary>
-        private static (string L1, string L2) Split(string label) => label switch
-        {
-            "ALTIM SET" => ("ALTIM", "SET"),
-            "AUTO HO INHIB" => ("AUTO HO", "INHIB"),
-            "CONFLCT ALERT" => ("CONFLCT", "ALERT"),
-            "CPDLC ADV" => ("CPDLC", "ADV"),
-            "CPDLC HIST" => ("CPDLC", "HIST"),
-            "CPDLC MSGOUT" => ("CPDLC", "MSGOUT"),
-            "CPDLC TOC SET" => ("CPDLC", "TOC SET"),
-            "DEPT LIST" => ("DEPT", "LIST"),
-            "FLIGHT EVENT" => ("FLIGHT", "EVENT"),
-            "GROUP SUP" => ("GROUP", "SUP"),
-            "HOLD LIST" => ("HOLD", "LIST"),
-            "INBND LIST" => ("INBND", "LIST"),
-            "MRP LIST" => ("MRP", "LIST"),
-            "SAA FILTER" => ("SAA", "FILTER"),
-            "WX REPORT" => ("WX", "REPORT"),
-            _ => (label, ""),
-        };
-
-        private const double CellW = 94, CellH = 32, Gap = 2, FrameT = 2;
-        private const double BarX = 1, BarW = 11, BodyX = 14, BodyW = 79, InnerY = 1, InnerH = 30;
+        private const int CellW = 94, CellH = 32, Gap = 2, FrameT = 2;
+        private const int BarX = 1, BarW = 11, BodyX = 14, BodyY = 1;
 
         private readonly SelectorSettings _settings;
         private readonly Func<string, bool> _isOn;
@@ -74,7 +55,7 @@ namespace CrcCompanion.Ui
             double gridH = FrameT * 2 + 2 * CellH + Gap;
 
             // VIEWS menu button, aligned with grid row 1.
-            DrawCell(p, 0, FrameT, "VIEWS", "", true,
+            DrawCell(p, 0, FrameT, "VIEWS",
                 _settings.Open ? Eram.TbMenuOpen : Eram.TbMenuClosed,
                 onBody: () => { _settings.Open = !_settings.Open; Surface.Refresh(); Changed?.Invoke(); },
                 onBar: BeginReposition);
@@ -89,16 +70,13 @@ namespace CrcCompanion.Ui
             {
                 for (int c = 0; c < 10; c++)
                 {
+                    var label = Grid[r, c];
+                    if (label == null) continue; // gray filler cell: the gap color shows through
                     double cx = gx + FrameT + c * (CellW + Gap);
                     double cy = FrameT + r * (CellH + Gap);
-                    var label = Grid[r, c];
-                    if (label == null) continue; // gray filler cell (gap color shows through)
-
                     bool wired = label == AltimKey || label == WxKey;
                     bool on = wired && _isOn(label);
-                    var (l1, l2) = Split(label);
-                    bool hasBar = label != "CRR";
-                    DrawCell(p, cx, cy, l1, l2, hasBar, on ? Eram.TbOn : Eram.TbOff,
+                    DrawCell(p, cx, cy, label, on ? Eram.TbOn : Eram.TbOff,
                         onBody: wired ? () => _toggle(label) : (Action?)null,
                         onBar: null);
                 }
@@ -107,22 +85,15 @@ namespace CrcCompanion.Ui
             return new Size(CellW + gridW, gridH);
         }
 
-        private static void DrawCell(Painter p, double x, double y, string l1, string l2, bool hasBar,
-            System.Windows.Media.Brush body, Action? onBody, Action? onBar)
+        private static void DrawCell(Painter p, double x, double y, string label, Brush body, Action? onBody, Action? onBar)
         {
-            double fs = Eram.ToolbarFontSize;
             p.Fill(Eram.TbBorder, x, y, CellW, CellH);
-            double bx = hasBar ? x + BodyX : x + BarX;
-            double bw = hasBar ? BodyW : CellW - 2;
-            if (hasBar) p.Fill(Eram.TbTearoff, x + BarX, y + InnerY, BarW, InnerH);
-            p.Fill(body, bx, y + InnerY, bw, InnerH);
+            p.Fill(Eram.TbTearoff, x + BarX, y + BodyY, BarW, ToolbarLabels.Height);
+            p.Fill(body, x + BodyX, y + BodyY, ToolbarLabels.Width, ToolbarLabels.Height);
+            p.Runs(ToolbarLabels.Get(label), x + BodyX, y + BodyY, Eram.TbText);
 
-            double half = InnerH / 2;
-            p.TextCentered(l1, bx, y + InnerY, bw, fs, Eram.TbText, half);
-            if (l2.Length > 0) p.TextCentered(l2, bx, y + InnerY + half, bw, fs, Eram.TbText, half);
-
-            if (onBar != null && hasBar) p.Hit(x, y, BarX + BarW + 1, CellH, _ => onBar());
-            if (onBody != null) p.Hit(bx, y, bw, CellH, _ => onBody());
+            if (onBar != null) p.Hit(x, y, BodyX, CellH, _ => onBar());
+            if (onBody != null) p.Hit(x + BodyX, y, ToolbarLabels.Width + 1, CellH, _ => onBody());
         }
     }
 }

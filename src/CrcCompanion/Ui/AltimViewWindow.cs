@@ -6,15 +6,17 @@ using CrcCompanion.Core;
 namespace CrcCompanion.Ui
 {
     /// <summary>
-    /// ERAM Altimeter Settings View. Each entry: [marker] STN  HHMM ALT
-    /// Time underlined when stale (&gt;65 min); setting underlined when below 29.92;
+    /// ERAM Altimeter Settings View, laid out to CRC's measured geometry:
+    /// [marker 13x17] 11 px [STN___HHMM_ALT] 11 px, columns 203 px apart at FONT 2.
+    /// Time is underlined when stale (&gt;65 min), the setting when below 29.92;
     /// -M- when the report is missing or older than 120 min.
     /// Entries fill LINES rows per column, across COL columns.
     /// </summary>
     public sealed class AltimViewWindow : ListViewWindow
     {
-        // "BOS  1754 012": 5 (station) + 4 (time) + 1 + 3 (altimeter)
-        private const int TextChars = 13;
+        // "HGR   1753 030": 6 (station) + 4 (time) + 1 + 3 (altimeter), as in CRC
+        private const int StationChars = 6;
+        private const int TextChars = StationChars + 4 + 1 + 3;
 
         public AltimViewWindow(IViewHost host, ViewSettings settings) : base(host, settings, "ALTIM SET") { }
 
@@ -34,10 +36,9 @@ namespace CrcCompanion.Ui
 
         protected override Size PaintBody(Painter p, double x0, double y0)
         {
-            double fs = FontPx, cw = p.CharW(fs), lh = p.LineH(fs);
-            double markerW = Math.Round(cw), markerGap = 6;
-            double textX = Pad + (Settings.Tearoff ? markerW + markerGap : 0);
-            double entryW = textX + TextChars * cw + Pad + 2;
+            var m = M;
+            int markerBlock = Settings.Tearoff ? m.MarkerW + EntryGap : 0;
+            int entryW = markerBlock + m.TextWidth(TextChars) + EntryGap;
 
             var stations = Settings.Stations;
             int lines = Math.Max(1, Settings.Lines);
@@ -52,7 +53,8 @@ namespace CrcCompanion.Ui
             for (int i = 0; i < shown; i++)
             {
                 int col = i / lines, row = i % lines;
-                double ex = x0 + col * entryW, ey = y0 + 2 + row * lh;
+                double ex = x0 + LeftPad + col * entryW;
+                double ey = y0 + row * m.Row;
                 var id = stations[i];
                 var st = StationState(id, now);
 
@@ -67,18 +69,19 @@ namespace CrcCompanion.Ui
                     altUnderline = hundredths < Metar.StandardHundredths;
                 }
 
-                if (Settings.Tearoff) p.Fill(Eram.Marker, ex + Pad, ey + 2, markerW, lh - 4);
+                if (Settings.Tearoff) DrawMarker(p, ex, ey);
 
-                var line = id.PadRight(5) + st.Time + " " + alt;
-                double tx = ex + textX;
-                p.Text(line, tx, ey, fs, tb, lh);
-                if (st.Stale) p.Underline(tx, ey, lh, 5, 4, fs, tb);
-                if (altUnderline) p.Underline(tx, ey, lh, 10, 3, fs, tb);
+                double tx = ex + markerBlock, top = ey + m.GlyphTopInRow;
+                p.Text(id.PadRight(StationChars) + st.Time + " " + alt, tx, top, m, tb);
+                if (st.Stale) p.Underline(tx, top, m, StationChars, 4, tb);
+                if (altUnderline) p.Underline(tx, top, m, StationChars + 5, 3, tb);
 
-                p.Hit(ex, ey, entryW, lh, _ => OpenDeletePopup(id));
+                p.Hit(ex, ey, entryW, m.Row, _ => OpenDeletePopup(id));
             }
 
-            return new Size(cols * entryW, rows * lh + 4);
+            double width = LeftPad + cols * entryW + RightPad;
+            double height = (rows - 1) * m.Row + m.MarkerH;
+            return new Size(width, height);
         }
     }
 }

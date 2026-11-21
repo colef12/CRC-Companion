@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using CrcCompanion.Core;
+using CrcCompanion.Ui;
 
 internal static class Program
 {
@@ -109,6 +110,32 @@ internal static class Program
         store.SaveSettings(new AppSettings { ActiveProfile = "ZID" });
         Eq("settings round-trip", "ZID", store.LoadSettings().ActiveProfile);
         Directory.Delete(dir, true);
+
+        // --- ERAM font (captured from CRC at FONT 2) ---
+        foreach (var c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/.+<>")
+            Check($"glyph '{c}' present", EramFont.Has(c));
+        Eq("slashed zero matches capture",
+            "....####....|...##..####.|..##....##..|.##....####.|.##...##.##.|.##..##..##.|.##.##...##.|.####....##.|..##....##..|.####..##...|....####....",
+            string.Join("|", EramFont.Preview('0')));
+        Eq("lowercase maps to caps", string.Join("|", EramFont.Preview('A')), string.Join("|", EramFont.Preview('a')));
+        Eq("unknown char draws nothing", 0, EramFont.Runs('~').Length);
+
+        var m2 = new CrcCompanion.Ui.EramMetrics(2);
+        Eq("FONT 2 cell 12", 12, m2.Cell);
+        Eq("FONT 2 cap 11", 11, m2.Cap);
+        Eq("FONT 2 row 21", 21, m2.Row);
+        Eq("FONT 2 title 17", 17, m2.TitleH);
+        Eq("FONT 2 box 23", 23, m2.BoxW);
+        Eq("FONT 2 marker 17", 17, m2.MarkerH);
+        Eq("FONT 2 glyph top in row 5", 5, m2.GlyphTopInRow);
+        Eq("FONT 2 glyph top in title 3", 3, m2.GlyphTopInTitle);
+
+        // --- Toolbar labels (captured pixels) ---
+        int Ink(string label) { int n = 0; foreach (var r in ToolbarLabels.Get(label)) n += r.W * r.H; return n; }
+        Eq("ALTIM SET label ink", 252, Ink("ALTIM SET"));
+        Eq("WX REPORT label ink", 292, Ink("WX REPORT"));
+        Eq("VIEWS label ink", 176, Ink("VIEWS"));
+        Check("CRR label present", ToolbarLabels.Has("CRR"));
 
         Console.WriteLine($"\n{_pass} passed, {_fail} failed");
         return _fail == 0 ? 0 : 1;

@@ -99,12 +99,8 @@ namespace CrcCompanion.Ui
                     foreach (var i in t.Inbound) lines.Add((StripFormat.Inbound(i, route, connected), false, i.Callsign));
                     break;
                 case StripKind.InSector:
-                    foreach (var i in t.InSector)
-                    {
-                        bool other = i.Freq != FreqStatus.Mine && i.Freq != FreqStatus.None;
-                        if (other && !Settings.ShowOthers) continue;
+                    foreach (var i in Core.Traffic.VisibleInSector(t.InSector, connected, Settings.ShowOthers))
                         lines.Add((StripFormat.InSector(i, route, connected, f.DisplayAirport), false, i.Callsign));
-                    }
                     break;
                 case StripKind.Departures:
                     string? group = null;

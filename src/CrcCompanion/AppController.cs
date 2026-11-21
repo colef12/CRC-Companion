@@ -45,6 +45,8 @@ namespace CrcCompanion
         public TrafficResult? Traffic { get; private set; }
         public FacilityContext? Facility { get; private set; }
         public bool Connected { get; private set; }
+        /// <summary>Logged on, but not working a position with a frequency (e.g. an observer).</summary>
+        public bool Observing { get; private set; }
         public string StatusText { get; private set; } = "LOADING";
 
         public AppController(Application app)
@@ -283,6 +285,8 @@ namespace CrcCompanion
                 if (_settings.Cid.Length == 0) return Facility == null ? "Set your VATSIM CID" : $"Facility {ShortFir}: from profile (CID not set)";
                 if (Connected && Facility != null)
                     return $"Connected: {Facility.MyCallsign} {Facility.MyFrequencyHz / 1e6:0.000} ({ShortFir})";
+                if (Observing && Facility != null)
+                    return $"Observing: {Facility.MyCallsign} ({ShortFir}) - showing all traffic";
                 if (Facility != null) return $"Not connected - using {ShortFir} from profile";
                 return _live.LastError.Length > 0 ? _live.LastError : "Not connected";
             }
@@ -296,7 +300,7 @@ namespace CrcCompanion
             var snap = _live.Latest;
             if (map != null && snap != null && int.TryParse(_settings.Cid, out var cid) && cid > 0)
             {
-                var me = snap.Controllers.FirstOrDefault(c => c.Cid == cid && c.Facility > VatsimFeed.FacObs);
+                var me = snap.Controllers.FirstOrDefault(c => c.Cid == cid);
                 var callsign = me?.Callsign ?? "";
                 if (callsign != _lastSessionCallsign)
                 {
@@ -326,12 +330,13 @@ namespace CrcCompanion
             Traffic = null;
             Facility = null;
             Connected = false;
+            Observing = false;
 
             if (map == null) { StatusText = "LOADING MAP DATA"; RefreshStrips(); return; }
 
             Controller? me = null;
             if (snap != null && int.TryParse(_settings.Cid, out var cid) && cid > 0)
-                me = snap.Controllers.FirstOrDefault(c => c.Cid == cid && c.Facility > VatsimFeed.FacObs);
+                me = snap.Controllers.FirstOrDefault(c => c.Cid == cid);   // includes observers
 
             // Facility: the position you're logged on as, else the profile name (e.g. "ZDC").
             var fir = me != null ? map.FirForCallsign(me.Callsign) : null;
@@ -344,13 +349,17 @@ namespace CrcCompanion
                 return;
             }
 
-            Connected = me != null && me.FrequencyHz > 0 && string.Equals(map.FirForCallsign(me.Callsign), fir, StringComparison.OrdinalIgnoreCase);
+            // Connected = working a position with a frequency. Observers (facility 0, 199.998) aren't.
+            Connected = me != null && me.Facility > VatsimFeed.FacObs && me.FrequencyHz > 0 &&
+                        string.Equals(map.FirForCallsign(me.Callsign), fir, StringComparison.OrdinalIgnoreCase);
+            Observing = me != null && !Connected;
             Facility = new FacilityContext
             {
                 Fir = fir,
                 Boundary = boundary,
                 Airports = map.AirportsInFir(fir).ToDictionary(a => a.Icao, StringComparer.OrdinalIgnoreCase),
-                MyCallsign = Connected ? me!.Callsign : "",
+                // Always exclude your own logon from "other controllers".
+                MyCallsign = me?.Callsign ?? "",
                 MyFrequencyHz = Connected ? me!.FrequencyHz : 0,
                 FirForCallsign = map.FirForCallsign,
             };

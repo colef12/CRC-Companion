@@ -172,6 +172,14 @@ namespace CrcCompanion.Core
                 With = with,
             };
 
+        /// <summary>
+        /// IN SECTOR filter. Aircraft working another local controller are hidden only when you're
+        /// working a position yourself (connected with a frequency) and OTHERS is off. Observing or
+        /// offline, everyone inside is shown, with their frequency marks.
+        /// </summary>
+        public static IEnumerable<StripItem> VisibleInSector(IEnumerable<StripItem> items, bool connected, bool showOthers) =>
+            items.Where(i => showOthers || !connected || i.Freq == FreqStatus.Mine || i.Freq == FreqStatus.None);
+
         public static FreqStatus StatusFor(int facility) => facility switch
         {
             VatsimFeed.FacCtr => FreqStatus.Center,

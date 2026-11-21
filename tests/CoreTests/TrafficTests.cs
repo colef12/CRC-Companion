@@ -127,6 +127,26 @@ KZNY|New York|NY|KZNY
         eq("JBU5 filed alt", 340, jbu.AltitudeHundreds);
         eq("JBU5 on my freq", FreqStatus.Mine, jbu.Freq);
 
+        // Observer / offline: everyone inside is listed, even aircraft working other controllers.
+        eq("filter: observing shows all", "AAL1,DAL2,EGF7,N123AB",
+            string.Join(",", Traffic.VisibleInSector(r.InSector, connected: false, showOthers: false).Select(i => i.Callsign)));
+        eq("filter: controlling hides others", "AAL1,EGF7,N123AB",
+            string.Join(",", Traffic.VisibleInSector(r.InSector, connected: true, showOthers: false).Select(i => i.Callsign)));
+        eq("filter: OTHERS on shows all", "AAL1,DAL2,EGF7,N123AB",
+            string.Join(",", Traffic.VisibleInSector(r.InSector, connected: true, showOthers: true).Select(i => i.Callsign)));
+
+        // Observer whose CID matches: own logon excluded from local controllers, no frequency.
+        var obsSnap = VatsimFeed.ParseMain(Feed.Replace("\"cid\":1243205,\"callsign\":\"TS_12_CTR\",\"frequency\":\"133.700\",\"facility\":6",
+                                                       "\"cid\":1243205,\"callsign\":\"TS_OBS\",\"frequency\":\"199.998\",\"facility\":0"));
+        VatsimFeed.AddTransceivers(obsSnap, Radios);
+        var obsMe = obsSnap.Controllers.First(c => c.Cid == 1243205);
+        eq("observer: facility 0", 0, obsMe.Facility);
+        eq("observer: no frequency", 0L, obsMe.FrequencyHz);
+        var obsCtx = new FacilityContext { Fir = "KTST", Boundary = bnd, Airports = ctx.Airports, MyCallsign = obsMe.Callsign, MyFrequencyHz = 0, FirForCallsign = map.FirForCallsign };
+        var obs = Traffic.Compute(obsSnap, obsCtx, 20, now);
+        eq("observer: AAL1 on the (other) controller's freq is not 'mine'", FreqStatus.None, obs.InSector.First(i => i.Callsign == "AAL1").Freq);
+        eq("observer: all listed", 4, Traffic.VisibleInSector(obs.InSector, false, false).Count());
+
         eq("strip: in sector line", "* AAL1     A321 JFK   350 2201 J75 LDN",
             StripFormat.InSector(byCs["AAL1"], 24, true, ctx.DisplayAirport));
         eq("strip: untuned flag", "? EGF7     E75L DCA   090 7707 Y",

@@ -84,6 +84,13 @@ internal static class Program
         Eq("wrap report keeps prefix spacing",
             "ALB  1451 18009KT 10SM|FEW030 BKN049 03/M06|A3033 RMK AO2 SLP273|T00281056 53019",
             string.Join("|", Metar.WrapReport("ALB  1451 ", "18009KT 10SM FEW030 BKN049 03/M06 A3033 RMK AO2 SLP273 T00281056 53019", 25)));
+        // Line breaks exactly as CRC's WX view shows them (6-char station field, 25-char lines).
+        Eq("wrap matches CRC (RDU)",
+            "RDU   1751 06009KT 10SM|FEW090 SCT110 BKN130|OVC200 18/07 A3020 RMK|AO2 SLP225 T01780067|10178 20106 58023",
+            string.Join("|", Metar.WrapReport("RDU   1751 ", "06009KT 10SM FEW090 SCT110 BKN130 OVC200 18/07 A3020 RMK AO2 SLP225 T01780067 10178 20106 58023", 25)));
+        Eq("wrap matches CRC (RIC, exact 25)",
+            "RIC   1754 05008KT 10SM|SCT150 BKN220 18/04 A3026|RMK AO2 SLP253 T01780044|10183 20028 58023 $",
+            string.Join("|", Metar.WrapReport("RIC   1754 ", "05008KT 10SM SCT150 BKN220 18/04 A3026 RMK AO2 SLP253 T01780044 10183 20028 58023 $", 25)));
         Eq("wrap report -M-", "BOS       -M-", string.Join("|", Metar.WrapReport("BOS       ", "-M-", 25)));
         Eq("wrap report empty body", "BOS", string.Join("|", Metar.WrapReport("BOS  ", "", 25)));
 

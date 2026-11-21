@@ -6,19 +6,23 @@ using CrcCompanion.Core;
 namespace CrcCompanion.Ui
 {
     /// <summary>
-    /// ERAM Weather Station Report View. Each entry starts "STN  HHMM " followed by the
-    /// METAR body, wrapped to a fixed width, with a blank line between entries.
-    /// Shows LINES lines with a scroll bar; '&gt;' marks a report that continues below.
-    /// Uses the same row pitch, markers and chrome as the Altimeter view.
+    /// ERAM Weather Station Report View, laid out to CRC's measured geometry (FONT 2):
+    /// "STN   HHMM " + METAR body wrapped at 25 characters, 17 px lines, 16 px extra between
+    /// reports, a marker on each report's first line. LINES = most text lines shown; the view
+    /// shrinks to its content, and the scroll bar appears only when reports overflow LINES.
+    /// '&gt;' marks a report cut off at the bottom.
     /// </summary>
     public sealed class WxViewWindow : ListViewWindow
     {
-        private const int WrapChars = 25;
-        private int _scroll;
+        public const int WrapChars = 25;
+        private const int StationChars = 6;
+        /// <summary>Space kept at the right for the scroll bar, as CRC does even when it's hidden.</summary>
+        private const int ScrollRightPad = 4;
+        private int _scroll; // first visible text line
 
         private sealed class WxLine
         {
-            public int Entry = -1;     // -1 = blank separator
+            public int Entry;
             public string Text = "";
             public bool First;
             public bool StaleTime;
@@ -52,8 +56,7 @@ namespace CrcCompanion.Ui
                 else if (st.Report == null || st.Expired) body = "-M-";
                 else body = st.Report.Body;
 
-                var wrapped = Metar.WrapReport(id.PadRight(5) + st.Time + " ", body, WrapChars);
-                if (all.Count > 0) all.Add(new WxLine());
+                var wrapped = Metar.WrapReport(id.PadRight(StationChars) + st.Time + " ", body, WrapChars);
                 for (int i = 0; i < wrapped.Count; i++)
                 {
                     all.Add(new WxLine
@@ -80,44 +83,63 @@ namespace CrcCompanion.Ui
         protected override Size PaintBody(Painter p, double x0, double y0)
         {
             var m = M;
+            int linePitch = m.TitleH;          // 17 at FONT 2
+            int entryGap = m.TitleH - 1;       // 16 at FONT 2
             int markerBlock = Settings.Tearoff ? m.MarkerW + EntryGap : 0;
-            int textW = m.TextWidth(WrapChars + 1);
+            int textW = m.TextWidth(WrapChars);
             int sbW = m.BoxW;
-            int visible = Math.Max(1, Settings.Lines);
-            double width = LeftPad + markerBlock + textW + EntryGap + sbW + 2;
-            double height = (visible - 1) * m.Row + m.MarkerH;
+            double width = LeftPad + markerBlock + textW + EntryGap + sbW + ScrollRightPad;
 
             var lines = BuildLines();
-            int maxScroll = Math.Max(0, lines.Count - visible);
+            int maxLines = Math.Max(1, Settings.Lines);
+            int maxScroll = Math.Max(0, lines.Count - maxLines);
             _scroll = Math.Clamp(_scroll, 0, maxScroll);
+            bool overflow = lines.Count > maxLines;
+            int count = Math.Min(maxLines, lines.Count - _scroll);
 
-            if (!p.Drawing) return new Size(width, height);
+            // Line tops relative to y0.
+            var tops = new double[Math.Max(count, 0)];
+            double yy = 0;
+            for (int v = 0; v < count; v++)
+            {
+                if (v > 0) yy += linePitch + (lines[_scroll + v].Entry != lines[_scroll + v - 1].Entry ? entryGap : 0);
+                tops[v] = yy;
+            }
+            double contentH = count == 0 ? m.GlyphTopInRow + m.Cap : tops[count - 1] + m.GlyphTopInRow + m.Cap;
+            if (overflow) contentH = Math.Max(contentH, 3 * sbW); // room for a usable scroll bar
+
+            if (!p.Drawing) return new Size(width, contentH);
 
             var tb = TextBrush;
-            for (int v = 0; v < visible; v++)
+            for (int v = 0; v < count; v++)
             {
                 int idx = _scroll + v;
-                if (idx >= lines.Count) break;
                 var ln = lines[idx];
-                if (ln.Entry < 0) continue;
-                double ly = y0 + v * m.Row;
+                double ly = y0 + tops[v];
 
                 if (ln.First && Settings.Tearoff) DrawMarker(p, x0 + LeftPad, ly);
 
                 var text = ln.Text;
-                bool lastVisible = v == visible - 1;
-                if (lastVisible && idx + 1 < lines.Count && lines[idx + 1].Entry == ln.Entry) text = text.PadRight(WrapChars) + ">";
+                if (v == count - 1 && idx + 1 < lines.Count && lines[idx + 1].Entry == ln.Entry)
+                    text = text.PadRight(WrapChars) + ">";
 
                 double tx = x0 + LeftPad + markerBlock, top = ly + m.GlyphTopInRow;
                 p.Text(text, tx, top, m, tb);
-                if (ln.StaleTime) p.Underline(tx, top, m, 5, 4, tb);
+                if (ln.StaleTime) p.Underline(tx, top, m, StationChars, 4, tb);
 
                 var station = ln.Station;
-                p.Hit(x0, ly, LeftPad + markerBlock + textW, m.Row, _ => OpenDeletePopup(station));
+                double hitH = v + 1 < count ? tops[v + 1] - tops[v] : m.Row;
+                p.Hit(x0, ly, LeftPad + markerBlock + textW, hitH, _ => OpenDeletePopup(station));
             }
 
-            // Scroll bar: up box, track with thumb, down box. Spans the padded body height.
-            double sx = x0 + width - sbW - 2, sy = y0 - BodyPad + 2, sh = height + BodyPad * 2 - 4;
+            if (overflow) DrawScrollBar(p, x0 + width - ScrollRightPad - sbW, y0 - BodyPad + 2, sbW,
+                contentH + BodyPad * 2 - 4, lines.Count, maxLines, maxScroll);
+
+            return new Size(width, contentH);
+        }
+
+        private void DrawScrollBar(Painter p, double sx, double sy, int sbW, double sh, int total, int visible, int maxScroll)
+        {
             p.Frame(Eram.ViewBorder, sx, sy, sbW, sh, 1);
             p.Fill(Eram.ViewBorder, sx, sy + sbW, sbW, 1);
             p.Fill(Eram.ViewBorder, sx, sy + sh - sbW - 1, sbW, 1);
@@ -127,18 +149,13 @@ namespace CrcCompanion.Ui
             p.Hit(sx, sy + sh - sbW, sbW, sbW, _ => ScrollBy(1));
 
             double trackY = sy + sbW + 1, trackH = sh - 2 * sbW - 2;
-            if (trackH > 6)
-            {
-                int total = Math.Max(lines.Count, 1);
-                double frac = Math.Min(1.0, visible / (double)total);
-                double thumbH = Math.Max(6, Math.Floor((trackH - 4) * frac));
-                double thumbY = Math.Floor(trackY + 2 + (trackH - 4 - thumbH) * (maxScroll == 0 ? 0 : _scroll / (double)maxScroll));
-                p.Frame(Eram.ScrollGray, sx + 3, thumbY, sbW - 6, thumbH, 1);
-                p.Hit(sx, trackY, sbW, thumbY - trackY, _ => ScrollBy(-visible));
-                p.Hit(sx, thumbY + thumbH, sbW, trackY + trackH - (thumbY + thumbH), _ => ScrollBy(visible));
-            }
-
-            return new Size(width, height);
+            if (trackH <= 6) return;
+            double frac = Math.Min(1.0, visible / (double)Math.Max(total, 1));
+            double thumbH = Math.Max(6, Math.Floor((trackH - 4) * frac));
+            double thumbY = Math.Floor(trackY + 2 + (trackH - 4 - thumbH) * (maxScroll == 0 ? 0 : _scroll / (double)maxScroll));
+            p.Frame(Eram.ScrollGray, sx + 3, thumbY, sbW - 6, thumbH, 1);
+            p.Hit(sx, trackY, sbW, thumbY - trackY, _ => ScrollBy(-visible));
+            p.Hit(sx, thumbY + thumbH, sbW, trackY + trackH - (thumbY + thumbH), _ => ScrollBy(visible));
         }
     }
 }

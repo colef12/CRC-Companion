@@ -1,0 +1,51 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Core tests
+        shell: bash
+        run: dotnet run --project tests/CoreTests -c Release
+
+      - name: Publish single-file exe
+        shell: bash
+        run: >
+          dotnet publish src/CrcCompanion/CrcCompanion.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -o out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CRCCompanion
+          path: out/CRCCompanion.exe
+
+      - name: Update "latest" release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest out/CRCCompanion.exe \
+            --title "Latest build (${GITHUB_SHA::7})" \
+            --notes "Automatic build of main at ${GITHUB_SHA::7}. Download CRCCompanion.exe and run it; no install needed." \
+            --prerelease --target "$GITHUB_SHA"

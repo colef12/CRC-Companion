@@ -14,6 +14,7 @@ Get **CRCCompanion.exe** from the [latest release](../../releases/tag/latest). I
 | Altimeter Settings view | ✅ |
 | Weather Station Report view | ✅ |
 | Per-facility profiles | ✅ |
+| INBND LIST, IN SECTOR and DEPT LIST strip views | ✅ Live from VATSIM data |
 
 In CRC, turn off its own ALTIM SET and WX REPORT views so they aren't shown twice.
 
@@ -49,6 +50,28 @@ Right-click the tray icon to switch, create, duplicate, rename or delete profile
 Profiles are stored in `%APPDATA%\CRCCompanion\profiles\NAME.json`. The tray menu's **Open profiles folder** opens it, so profiles can be backed up or shared.
 
 The tray menu also has **Size**, an extra scale on top of Windows display scaling so the views can match CRC's size exactly, and **Reset view positions**.
+
+## Strip views (INBND LIST, IN SECTOR, DEPT LIST)
+
+Set your **VATSIM CID** from the tray menu. While you're logged on, the app finds your position in VATSIM's live data, works out the ARTCC from the callsign (`DC_`/`WAS_` → ZDC), and can switch to that facility's profile automatically. When you're not connected, a profile named after a facility (e.g. `ZDC`) uses that facility.
+
+| View | Shows |
+|---|---|
+| INBND LIST | Flights outside the ARTCC projected to enter within 20 minutes (M → MIN), sorted by entry time |
+| IN SECTOR | Airborne flights inside the ARTCC. Flights working another local controller are hidden unless M → OTHERS is on. |
+| DEPT LIST | Flights on the ground at an ARTCC airport with a flight plan, plus prefiles, grouped by airport |
+
+Each strip is one line: `mark callsign type time/destination altitude beacon route`. The route width is set by M → ROUTE. The mark shows whose frequency the aircraft is tuned to (from VATSIM's voice data):
+
+| Mark | Meaning |
+|---|---|
+| `*` | Your frequency |
+| `A` / `T` / `G` | A local approach, tower or ground/delivery frequency |
+| `C` | Another Center sector in your ARTCC |
+| `?` | In your airspace on nobody's frequency (only while you're connected) |
+| `P` | Prefiled, not connected yet |
+
+ARTCC boundaries, callsign prefixes and airports come from VATSIM's `vatspy-data-project`, refreshed weekly. Traffic refreshes every 15 seconds.
 
 ## Weather data
 

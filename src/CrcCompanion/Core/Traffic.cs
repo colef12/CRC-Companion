@@ -222,23 +222,50 @@ namespace CrcCompanion.Core
         private static string Sq(string s) => Fit(string.IsNullOrWhiteSpace(s) ? "" : s.Trim(), 4);
 
         /// <summary>"* AAL1272 A319 E1552 350 2476 ROUTE..." (E = estimated entry time, UTC).</summary>
-        public static string Inbound(StripItem i, int routeChars, bool flagUntuned)
+        public static string Inbound(StripItem i, int routeChars, bool flagUntuned, bool routeTail = false)
         {
             var e = i.EntryUtc.HasValue ? "E" + i.EntryUtc.Value.ToString("HHmm", CultureInfo.InvariantCulture) : "     ";
-            return Line(Mark(i, false), i, e, Alt(i.AltitudeHundreds), routeChars);
+            return Line(Mark(i, false), i, e, Alt(i.AltitudeHundreds), routeChars, routeTail);
         }
 
         /// <summary>"* AAL1272 A319 DCA  350 2476 ROUTE..." (destination, current altitude).</summary>
-        public static string InSector(StripItem i, int routeChars, bool flagUntuned, Func<string, string> airport)
-            => Line(Mark(i, flagUntuned), i, Fit(airport(i.Destination), 5), Alt(i.AltitudeHundreds), routeChars);
+        public static string InSector(StripItem i, int routeChars, bool flagUntuned, Func<string, string> airport, bool routeTail = false)
+            => Line(Mark(i, flagUntuned), i, Fit(airport(i.Destination), 5), Alt(i.AltitudeHundreds), routeChars, routeTail);
 
         /// <summary>"P AAL1272 A319 DFW  350 2476 ROUTE..." (destination, filed altitude).</summary>
         public static string Departure(StripItem i, int routeChars, Func<string, string> airport)
             => Line(Mark(i, false), i, Fit(airport(i.Destination), 5), Alt(i.AltitudeHundreds), routeChars);
 
-        private static string Line(char mark, StripItem i, string col3, string alt, int routeChars) =>
+        private static string Line(char mark, StripItem i, string col3, string alt, int routeChars, bool routeTail = false) =>
             (mark + " " + Fit(i.Callsign, CallsignChars) + " " + Fit(i.Type, 4) + " " + col3 + " " + alt + " " +
-             Sq(i.Squawk) + " " + Fit(i.Route, Math.Max(0, routeChars))).TrimEnd();
+             Sq(i.Squawk) + " " + FitRoute(i.Route, Math.Max(0, routeChars), routeTail)).TrimEnd();
+
+        /// <summary>Marks a route shown from its end ("..BAMMY FRDMM6").</summary>
+        public const string TailMark = "..";
+
+        /// <summary>
+        /// Fits a route into n characters. From the start: cut at n. From the end (arrivals into your
+        /// facility): the last whole words that fit, after "..", so the STAR and arrival fixes show.
+        /// </summary>
+        public static string FitRoute(string route, int n, bool fromEnd)
+        {
+            var r = string.Join(" ", (route ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            if (r.Length <= n || n <= 0) return n <= 0 ? "" : r;
+            if (!fromEnd) return r.Substring(0, n);
+
+            var words = r.Split(' ');
+            int budget = n - TailMark.Length;
+            var tail = "";
+            for (int k = words.Length - 1; k >= 0; k--)
+            {
+                var next = tail.Length == 0 ? words[k] : words[k] + " " + tail;
+                if (next.Length > budget) break;
+                tail = next;
+            }
+            // A single last word longer than the space: show its end.
+            if (tail.Length == 0) tail = words[^1].Substring(Math.Max(0, words[^1].Length - budget));
+            return TailMark + tail;
+        }
 
         public static int Width(int routeChars) => 1 + 1 + CallsignChars + 1 + 4 + 1 + 5 + 1 + 3 + 1 + 4 + 1 + routeChars;
     }

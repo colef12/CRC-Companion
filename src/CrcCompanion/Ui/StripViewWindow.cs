@@ -96,11 +96,13 @@ namespace CrcCompanion.Ui
             switch (_kind)
             {
                 case StripKind.Inbound:
-                    foreach (var i in t.Inbound) lines.Add((StripFormat.Inbound(i, route, connected), false, i.Callsign));
+                    // Flights landing in your facility show the end of their route (arrival fixes, STAR).
+                    foreach (var i in t.Inbound)
+                        lines.Add((StripFormat.Inbound(i, route, connected, f.Airports.ContainsKey(i.Destination)), false, i.Callsign));
                     break;
                 case StripKind.InSector:
                     foreach (var i in Core.Traffic.VisibleInSector(t.InSector, connected, Settings.ShowOthers))
-                        lines.Add((StripFormat.InSector(i, route, connected, f.DisplayAirport), false, i.Callsign));
+                        lines.Add((StripFormat.InSector(i, route, connected, f.DisplayAirport, f.Airports.ContainsKey(i.Destination)), false, i.Callsign));
                     break;
                 case StripKind.Departures:
                     string? group = null;

@@ -155,6 +155,18 @@ KZNY|New York|NY|KZNY
             StripFormat.Inbound(r.Inbound[0], 24, true));
         eq("strip: prefile line", "P FDX8     B752 MEM   310      Z",
             StripFormat.Departure(r.Departures.First(i => i.Callsign == "FDX8"), 24, ctx.DisplayAirport));
+        // Arrivals into the facility: show the end of the route, cut at whole words.
+        const string lax = "ORCKA5 GABBL HLYWD1 SUBDO J6 ACO J60 PSB J152 HAR BAMMY FRDMM6";
+        eq("route: start (overflight)", "ORCKA5 GABBL HLYWD1 SUBD", StripFormat.FitRoute(lax, 24, fromEnd: false));
+        eq("route: end (arrival)", "..J152 HAR BAMMY FRDMM6", StripFormat.FitRoute(lax, 24, fromEnd: true));
+        check("route: end fits width", StripFormat.FitRoute(lax, 24, true).Length <= 24, "");
+        eq("route: short route unchanged", "DCT", StripFormat.FitRoute("DCT", 24, true));
+        eq("route: extra spaces collapsed", "A B", StripFormat.FitRoute("A   B", 24, false));
+        eq("route: one long last word", "..CDEFGH", StripFormat.FitRoute("X ABCDEFGH", 8, true));
+        eq("route: width 0", "", StripFormat.FitRoute(lax, 0, true));
+        eq("strip: arrival line shows route end", "* AAL1     A321 JFK   350 2201 ..J60 PSB J152 HAR BAMMY FRDMM6",
+            StripFormat.InSector(new StripItem { Callsign = "AAL1", Type = "A321", Destination = "KJFK", AltitudeHundreds = 350, Squawk = "2201", Route = lax, Freq = FreqStatus.Mine },
+                32, true, ctx.DisplayAirport, routeTail: true));
         eq("strip: route cut", "* AAL1     A321 JFK   350 2201 J7",
             StripFormat.InSector(byCs["AAL1"], 2, true, ctx.DisplayAirport));
 
